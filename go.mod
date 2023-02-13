@@ -1,6 +1,6 @@
 module github.com/linuxsuren/md-exec
 
-go 1.19
+go 1.18
 
 require github.com/golang-commonmark/markdown v0.0.0-20180910011815-a8f139058164
 
