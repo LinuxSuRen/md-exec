@@ -4,14 +4,17 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
+	"regexp"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/golang-commonmark/markdown"
 )
 
 func main() {
 	if len(os.Args) <= 1 {
-		fmt.Println("Usage: md-exec sample.md")
+		fmt.Println("Usage: mde sample.md")
 		return
 	}
 
@@ -25,47 +28,85 @@ func main() {
 	md := markdown.New(markdown.XHTMLOutput(true), markdown.Nofollow(true))
 	tokens := md.Parse(mdFile)
 
-	//Print the result
+	cmdMap := map[string][]string{}
+
+	// Print the result
+	var title string
 	for _, t := range tokens {
-		snippet := getSnippet(t)
-		snippet.content = strings.TrimSpace(snippet.content)
-		if snippet.content != "" {
-			if snippet.lang == "shell" {
-				lines := strings.Split(snippet.content, "\n")
-				for _, line := range lines {
-					items := strings.Split(line, " ")
-					data, _ := exec.Command(items[0], items[1:]...).CombinedOutput()
-					fmt.Print(string(data))
-				}
+		var (
+			content string
+			lang    string
+		)
+
+		switch tok := t.(type) {
+		case *markdown.Fence:
+			content = strings.TrimSpace(tok.Content)
+			lang = tok.Params
+		}
+
+		if content != "" && lang == "shell" {
+			// handle the break line
+			breakline := regexp.MustCompile(`\\\n`)
+			content = breakline.ReplaceAllString(content, "")
+
+			whitespaces := regexp.MustCompile(` +`)
+			content = whitespaces.ReplaceAllString(content, " ")
+
+			lines := strings.Split(content, "\n")
+			if len(lines) < 2 {
+				continue
+			}
+			title = lines[0]
+			if !strings.HasPrefix(title, "#!title: ") {
+				continue
+			}
+			title = strings.TrimPrefix(title, "#!title: ")
+			cmdMap[title] = append(cmdMap[title], lines[1:]...)
+		}
+	}
+
+	contextDir := path.Dir(mdFilePath)
+	// TODO this should be a treemap instead of hashmap
+	execute(cmdMap, contextDir)
+}
+
+func execute(cmdMap map[string][]string, contextDir string) (err error) {
+	var items []string
+	for key := range cmdMap {
+		items = append(items, key)
+	}
+
+	selector := &survey.MultiSelect{
+		Message: "Choose the code block to run",
+		Options: items,
+	}
+	titles := []string{}
+	if err = survey.AskOne(selector, &titles); err != nil {
+		return
+	}
+
+	for _, title := range titles {
+		cmds := cmdMap[title]
+		for _, cmdLine := range cmds {
+			fmt.Println("start to run:", cmdLine)
+
+			args := strings.Split(cmdLine, " ")
+			cmd := strings.TrimSpace(args[0])
+			if cmd, err = exec.LookPath(cmd); err != nil {
+				fmt.Println("failed to find", cmd)
+				continue
+			}
+
+			var output []byte
+			cmdRun := exec.Command(cmd, args[1:]...)
+			cmdRun.Dir = contextDir
+			cmdRun.Env = os.Environ()
+			if output, err = cmdRun.CombinedOutput(); err == nil {
+				fmt.Print(string(output))
+			} else {
+				fmt.Println(string(output), err)
 			}
 		}
 	}
-}
-
-// snippet represents the snippet we will output.
-type snippet struct {
-	content string
-	lang    string
-}
-
-// getSnippet extract only code snippet from markdown object.
-func getSnippet(tok markdown.Token) snippet {
-	switch tok := tok.(type) {
-	case *markdown.CodeBlock:
-		return snippet{
-			tok.Content,
-			"code",
-		}
-	case *markdown.CodeInline:
-		return snippet{
-			tok.Content,
-			"code inline",
-		}
-	case *markdown.Fence:
-		return snippet{
-			tok.Content,
-			tok.Params,
-		}
-	}
-	return snippet{}
+	return
 }
