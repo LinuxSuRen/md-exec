@@ -28,6 +28,7 @@ func NewRootCommand() (cmd *cobra.Command) {
 	cmd.Version = version
 	flags := cmd.Flags()
 	flags.BoolVarP(&opt.loop, "loop", "", true, "Run the Markdown in loop mode.")
+	flags.BoolVarP(&opt.keepFilter, "keep-filter", "", true, "Indicate if keep the filter.")
 	return
 }
 
@@ -99,7 +100,8 @@ func (o *option) runMarkdown(mdFilePath string) (err error) {
 }
 
 type option struct {
-	loop bool
+	loop       bool
+	keepFilter bool
 }
 
 func (o *option) execute(cmdMap map[string][]string, contextDir string) (err error) {
@@ -114,7 +116,7 @@ func (o *option) execute(cmdMap map[string][]string, contextDir string) (err err
 		Options: items,
 	}
 	titles := []string{}
-	if err = survey.AskOne(selector, &titles); err != nil {
+	if err = survey.AskOne(selector, &titles, survey.WithKeepFilter(o.keepFilter)); err != nil {
 		return
 	}
 
