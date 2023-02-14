@@ -14,6 +14,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// should be inject during the build process
+var version string
+
 func NewRootCommand() (cmd *cobra.Command) {
 	opt := &option{}
 	cmd = &cobra.Command{
@@ -22,6 +25,7 @@ func NewRootCommand() (cmd *cobra.Command) {
 		Args:    cobra.ExactArgs(1),
 		RunE:    opt.runE,
 	}
+	cmd.Version = version
 	flags := cmd.Flags()
 	flags.BoolVarP(&opt.loop, "loop", "", true, "Run the Markdown in loop mode.")
 	return
