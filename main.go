@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -88,25 +89,58 @@ func execute(cmdMap map[string][]string, contextDir string) (err error) {
 	for _, title := range titles {
 		cmds := cmdMap[title]
 		for _, cmdLine := range cmds {
-			fmt.Println("start to run:", cmdLine)
-
-			args := strings.Split(cmdLine, " ")
-			cmd := strings.TrimSpace(args[0])
-			if cmd, err = exec.LookPath(cmd); err != nil {
-				fmt.Println("failed to find", cmd)
-				continue
+			var shellFile string
+			if shellFile, err = writeAsShell(cmdLine, contextDir); err != nil {
+				fmt.Println(err)
+				break
 			}
+			defer func() {
+				_ = os.RemoveAll(shellFile)
+			}()
+
+			cmd := exec.Command("bash", path.Base(shellFile))
+			cmd.Dir = contextDir
+			cmd.Env = os.Environ()
 
 			var output []byte
-			cmdRun := exec.Command(cmd, args[1:]...)
-			cmdRun.Dir = contextDir
-			cmdRun.Env = os.Environ()
-			if output, err = cmdRun.CombinedOutput(); err == nil {
-				fmt.Print(string(output))
-			} else {
+			if output, err = cmd.CombinedOutput(); err != nil {
 				fmt.Println(string(output), err)
+				break
 			}
+			fmt.Print(string(output))
 		}
+	}
+	return
+}
+
+func writeAsShell(content, dir string) (targetPath string, err error) {
+	var f *os.File
+	if f, err = os.CreateTemp(dir, "sh"); err == nil {
+		defer func() {
+			_ = f.Close()
+		}()
+
+		targetPath = f.Name()
+		_, err = io.WriteString(f, content)
+	}
+	return
+}
+
+func runAsInlineCommand(cmdLine, contextDir string) (err error) {
+	args := strings.Split(cmdLine, " ")
+	cmd := strings.TrimSpace(args[0])
+	if cmd, err = exec.LookPath(cmd); err != nil {
+		err = fmt.Errorf("failed to find '%s'", cmd)
+		return
+	}
+
+	fmt.Printf("start to run: %s %v\n", cmd, args[1:])
+	var output []byte
+	cmdRun := exec.Command(cmd, args[1:]...)
+	cmdRun.Dir = contextDir
+	cmdRun.Env = os.Environ()
+	if output, err = cmdRun.CombinedOutput(); err == nil {
+		fmt.Print(string(output))
 	}
 	return
 }
