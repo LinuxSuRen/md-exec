@@ -20,6 +20,7 @@ builds:
     ldflags:
       - -w
       - -s
+      - -X github.com/linuxsuren/md-exec/cli.version={{.Version}}
 dist: release
 archives:
   - name_template: "{{ .Binary }}-{{ .Os }}-{{ .Arch }}"
