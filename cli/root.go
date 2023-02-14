@@ -125,29 +125,86 @@ func (o *option) execute(cmdMap map[string][]string, contextDir string) (err err
 			o.loop = false
 			break
 		}
+		preDefinedEnv := os.Environ()
 		cmds := cmdMap[title]
 		for _, cmdLine := range cmds {
-			var shellFile string
-			if shellFile, err = writeAsShell(cmdLine, contextDir); err != nil {
-				fmt.Println(err)
+			var pair []string
+			var ok bool
+			ok, pair, err = isInputRequest(cmdLine)
+			if err != nil {
 				break
 			}
-			defer func() {
-				_ = os.RemoveAll(shellFile)
-			}()
 
-			cmd := exec.Command("bash", path.Base(shellFile))
-			cmd.Dir = contextDir
-			cmd.Env = os.Environ()
+			if ok {
+				if pair, err = inputRequest(pair); err != nil {
+					break
+				}
+				os.Setenv(pair[0], pair[1])
+				continue
+			}
 
-			var output []byte
-			if output, err = cmd.CombinedOutput(); err != nil {
-				fmt.Println(string(output), err)
+			err = runCmdLine(cmdLine, contextDir)
+			if err != nil {
 				break
 			}
-			fmt.Print(string(output))
+		}
+
+		// reset the env
+		os.Clearenv()
+		for _, pair := range preDefinedEnv {
+			os.Setenv(strings.Split(pair, "=")[0], strings.Split(pair, "=")[1])
 		}
 	}
+	return
+}
+
+func isInputRequest(cmdLine string) (ok bool, pair []string, err error) {
+	var reg *regexp.Regexp
+	if reg, err = regexp.Compile(`^\w+=.+$`); err == nil {
+		items := strings.Split(cmdLine, "=")
+		if reg.MatchString(cmdLine) && len(items) == 2 {
+			pair = []string{strings.TrimSpace(items[0]), strings.TrimSpace(items[1])}
+			ok = true
+		}
+	}
+	return
+}
+
+func inputRequest(pair []string) (result []string, err error) {
+	input := survey.Input{
+		Message: pair[0],
+		Default: pair[1],
+	}
+	result = pair
+
+	var value string
+	if err = survey.AskOne(&input, &value); err == nil {
+		result[1] = value
+	}
+
+	return
+}
+
+func runCmdLine(cmdLine, contextDir string) (err error) {
+	var shellFile string
+	if shellFile, err = writeAsShell(cmdLine, contextDir); err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer func() {
+		_ = os.RemoveAll(shellFile)
+	}()
+
+	cmd := exec.Command("bash", path.Base(shellFile))
+	cmd.Dir = contextDir
+	cmd.Env = os.Environ()
+
+	var output []byte
+	if output, err = cmd.CombinedOutput(); err != nil {
+		fmt.Println(string(output), err)
+		return
+	}
+	fmt.Print(string(output))
 	return
 }
 
