@@ -31,6 +31,7 @@ func NewRootCommand() (cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.BoolVarP(&opt.loop, "loop", "", true, "Run the Markdown in loop mode.")
 	flags.BoolVarP(&opt.keepFilter, "keep-filter", "", true, "Indicate if keep the filter.")
+	flags.BoolVarP(&opt.keepScripts, "keep-scripts", "", false, "Indicate if keep the temporary scripts.")
 	return
 }
 
@@ -75,6 +76,8 @@ func (o *option) runMarkdown(mdFilePath string) (err error) {
 		}
 
 		if content != "" && lang == "shell" {
+			originalContent := content
+
 			// handle the break line
 			breakline := regexp.MustCompile(`\\\n`)
 			content = breakline.ReplaceAllString(content, "")
@@ -91,7 +94,15 @@ func (o *option) runMarkdown(mdFilePath string) (err error) {
 				continue
 			}
 			title = strings.TrimPrefix(title, "#!title: ")
-			cmdMap[title] = append(cmdMap[title], lines[1:]...)
+			// support multiple lines mode
+			if strings.Contains(title, "+f") {
+				title = strings.ReplaceAll(title, "+f", "")
+				title = strings.TrimSpace(title)
+
+				cmdMap[title] = append(cmdMap[title], originalContent)
+			} else {
+				cmdMap[title] = append(cmdMap[title], lines[1:]...)
+			}
 		}
 	}
 
@@ -102,8 +113,9 @@ func (o *option) runMarkdown(mdFilePath string) (err error) {
 }
 
 type option struct {
-	loop       bool
-	keepFilter bool
+	loop        bool
+	keepFilter  bool
+	keepScripts bool
 }
 
 func (o *option) execute(cmdMap map[string][]string, contextDir string) (err error) {
@@ -145,7 +157,7 @@ func (o *option) execute(cmdMap map[string][]string, contextDir string) (err err
 				continue
 			}
 
-			err = runCmdLine(cmdLine, contextDir)
+			err = runCmdLine(cmdLine, contextDir, o.keepScripts)
 			if err != nil {
 				break
 			}
@@ -187,15 +199,17 @@ func inputRequest(pair []string) (result []string, err error) {
 	return
 }
 
-func runCmdLine(cmdLine, contextDir string) (err error) {
+func runCmdLine(cmdLine, contextDir string, keepScripts bool) (err error) {
 	var shellFile string
 	if shellFile, err = writeAsShell(cmdLine, contextDir); err != nil {
 		fmt.Println(err)
 		return
 	}
-	defer func() {
-		_ = os.RemoveAll(shellFile)
-	}()
+	if !keepScripts {
+		defer func() {
+			_ = os.RemoveAll(shellFile)
+		}()
+	}
 
 	cmd := exec.Command("bash", path.Base(shellFile))
 	cmd.Dir = contextDir
