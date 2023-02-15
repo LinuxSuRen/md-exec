@@ -25,6 +25,17 @@ echo hello $name
 print('hello python world');
 ```
 
+## Run Golang
+```golang
+#!title: Golang Hello World
+fmt.Println("hello golang")
+
+items := []int{1,2,3,4}
+for _, item := range items {
+    fmt.Println(item)
+}
+```
+
 ## Limitation
 Please make sure the Markdown files meet Linux end-of-line.
 You could turn it via: `dos2unix your.md`
