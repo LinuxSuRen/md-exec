@@ -3,11 +3,8 @@ package cli
 
 import (
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path"
-	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -59,7 +56,8 @@ func (o *option) runMarkdown(mdFilePath string) (err error) {
 	md := markdown.New(markdown.XHTMLOutput(true), markdown.Nofollow(true))
 	tokens := md.Parse(mdFile)
 
-	cmdMap := map[string][]string{}
+	// cmdMap := map[string][]string{}
+	scriptList := NewScriptRunners()
 
 	// Print the result
 	var title string
@@ -75,40 +73,41 @@ func (o *option) runMarkdown(mdFilePath string) (err error) {
 			lang = tok.Params
 		}
 
-		if content != "" && lang == "shell" {
-			originalContent := content
+		if content == "" {
+			continue
+		}
 
-			// handle the break line
-			breakline := regexp.MustCompile(`\\\n`)
-			content = breakline.ReplaceAllString(content, "")
+		originalContent := content
+		lines := strings.Split(content, "\n")
+		if len(lines) < 2 {
+			continue
+		}
+		title = lines[0]
+		if !strings.HasPrefix(title, "#!title: ") {
+			continue
+		}
+		title = strings.TrimPrefix(title, "#!title: ")
 
-			whitespaces := regexp.MustCompile(` +`)
-			content = whitespaces.ReplaceAllString(content, " ")
+		script := Script{
+			Kind:        lang,
+			Title:       title,
+			Content:     originalContent,
+			Dir:         path.Dir(mdFilePath),
+			KeepScripts: o.keepScripts,
+		}
 
-			lines := strings.Split(content, "\n")
-			if len(lines) < 2 {
-				continue
-			}
-			title = lines[0]
-			if !strings.HasPrefix(title, "#!title: ") {
-				continue
-			}
-			title = strings.TrimPrefix(title, "#!title: ")
-			// support multiple lines mode
-			if strings.Contains(title, "+f") {
-				title = strings.ReplaceAll(title, "+f", "")
-				title = strings.TrimSpace(title)
-
-				cmdMap[title] = append(cmdMap[title], originalContent)
-			} else {
-				cmdMap[title] = append(cmdMap[title], lines[1:]...)
-			}
+		switch lang {
+		case "shell", "bash":
+			scriptList = append(scriptList, &ShellScript{
+				Script: script,
+			})
+		case "python3":
+			scriptList = append(scriptList, &PythonScript{
+				Script: script,
+			})
 		}
 	}
-
-	contextDir := path.Dir(mdFilePath)
-	// TODO this should be a treemap instead of hashmap
-	err = o.execute(cmdMap, contextDir)
+	err = o.executeScripts(scriptList)
 	return
 }
 
@@ -118,16 +117,10 @@ type option struct {
 	keepScripts bool
 }
 
-func (o *option) execute(cmdMap map[string][]string, contextDir string) (err error) {
-	var items []string
-	for key := range cmdMap {
-		items = append(items, key)
-	}
-
-	items = append(items, "Quit")
+func (o *option) executeScripts(scriptRunners ScriptRunners) (err error) {
 	selector := &survey.MultiSelect{
 		Message: "Choose the code block to run",
-		Options: items,
+		Options: scriptRunners.GetTitles(),
 	}
 	titles := []string{}
 	if err = survey.AskOne(selector, &titles, survey.WithKeepFilter(o.keepFilter)); err != nil {
@@ -139,119 +132,12 @@ func (o *option) execute(cmdMap map[string][]string, contextDir string) (err err
 			o.loop = false
 			break
 		}
-		preDefinedEnv := os.Environ()
-		cmds := cmdMap[title]
-		for _, cmdLine := range cmds {
-			var pair []string
-			var ok bool
-			ok, pair, err = isInputRequest(cmdLine)
-			if err != nil {
-				break
-			}
 
-			if ok {
-				if pair, err = inputRequest(pair); err != nil {
-					break
-				}
-				os.Setenv(pair[0], pair[1])
-				continue
-			}
-
-			err = runCmdLine(cmdLine, contextDir, o.keepScripts)
-			if err != nil {
-				break
-			}
+		if runner := scriptRunners.GetRunner(title); runner == nil {
+			fmt.Println("cannot found runner:", title)
+		} else if err = runner.Run(); err != nil {
+			break
 		}
-
-		// reset the env
-		os.Clearenv()
-		for _, pair := range preDefinedEnv {
-			os.Setenv(strings.Split(pair, "=")[0], strings.Split(pair, "=")[1])
-		}
-	}
-	return
-}
-
-func isInputRequest(cmdLine string) (ok bool, pair []string, err error) {
-	var reg *regexp.Regexp
-	if reg, err = regexp.Compile(`^\w+=.+$`); err == nil {
-		items := strings.Split(cmdLine, "=")
-		if reg.MatchString(cmdLine) && len(items) == 2 {
-			pair = []string{strings.TrimSpace(items[0]), strings.TrimSpace(items[1])}
-			ok = true
-		}
-	}
-	return
-}
-
-func inputRequest(pair []string) (result []string, err error) {
-	input := survey.Input{
-		Message: pair[0],
-		Default: pair[1],
-	}
-	result = pair
-
-	var value string
-	if err = survey.AskOne(&input, &value); err == nil {
-		result[1] = value
-	}
-
-	return
-}
-
-func runCmdLine(cmdLine, contextDir string, keepScripts bool) (err error) {
-	var shellFile string
-	if shellFile, err = writeAsShell(cmdLine, contextDir); err != nil {
-		fmt.Println(err)
-		return
-	}
-	if !keepScripts {
-		defer func() {
-			_ = os.RemoveAll(shellFile)
-		}()
-	}
-
-	cmd := exec.Command("bash", path.Base(shellFile))
-	cmd.Dir = contextDir
-	cmd.Env = os.Environ()
-
-	var output []byte
-	if output, err = cmd.CombinedOutput(); err != nil {
-		fmt.Println(string(output), err)
-		return
-	}
-	fmt.Print(string(output))
-	return
-}
-
-func writeAsShell(content, dir string) (targetPath string, err error) {
-	var f *os.File
-	if f, err = os.CreateTemp(dir, "sh"); err == nil {
-		defer func() {
-			_ = f.Close()
-		}()
-
-		targetPath = f.Name()
-		_, err = io.WriteString(f, content)
-	}
-	return
-}
-
-func runAsInlineCommand(cmdLine, contextDir string) (err error) {
-	args := strings.Split(cmdLine, " ")
-	cmd := strings.TrimSpace(args[0])
-	if cmd, err = exec.LookPath(cmd); err != nil {
-		err = fmt.Errorf("failed to find '%s'", cmd)
-		return
-	}
-
-	fmt.Printf("start to run: %s %v\n", cmd, args[1:])
-	var output []byte
-	cmdRun := exec.Command(cmd, args[1:]...)
-	cmdRun.Dir = contextDir
-	cmdRun.Env = os.Environ()
-	if output, err = cmdRun.CombinedOutput(); err == nil {
-		fmt.Print(string(output))
 	}
 	return
 }
