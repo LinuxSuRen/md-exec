@@ -19,6 +19,12 @@ name=linuxsuren
 echo hello $name
 ```
 
+### Run Python Script
+```python3
+#!title: Python Hello World
+print('hello python world');
+```
+
 ## Limitation
 Please make sure the Markdown files meet Linux end-of-line.
 You could turn it via: `dos2unix your.md`
