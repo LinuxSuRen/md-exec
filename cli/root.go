@@ -105,6 +105,10 @@ func (o *option) runMarkdown(mdFilePath string) (err error) {
 			scriptList = append(scriptList, &PythonScript{
 				Script: script,
 			})
+		case "golang", "go":
+			scriptList = append(scriptList, &GolangScript{
+				Script: script,
+			})
 		}
 	}
 	err = o.executeScripts(scriptList)
