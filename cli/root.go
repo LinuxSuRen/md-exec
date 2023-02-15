@@ -1,3 +1,4 @@
+// Package cli provides all the commands
 package cli
 
 import (
@@ -17,6 +18,7 @@ import (
 // should be inject during the build process
 var version string
 
+// NewRootCommand returns the instance of cobra.Command
 func NewRootCommand() (cmd *cobra.Command) {
 	opt := &option{}
 	cmd = &cobra.Command{
