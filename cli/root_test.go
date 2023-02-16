@@ -15,10 +15,6 @@ func TestNewRootCommand(t *testing.T) {
 		name:   "no argument",
 		args:   nil,
 		hasErr: true,
-	}, {
-		name:   "more than one argument",
-		args:   []string{"a", "b"},
-		hasErr: true,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

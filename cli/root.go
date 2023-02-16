@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -21,7 +22,7 @@ func NewRootCommand() (cmd *cobra.Command) {
 	cmd = &cobra.Command{
 		Use:     "mde",
 		Example: "mde README.md",
-		Args:    cobra.ExactArgs(1),
+		Args:    cobra.MinimumNArgs(1),
 		RunE:    opt.runE,
 	}
 	cmd.Version = version
@@ -33,10 +34,26 @@ func NewRootCommand() (cmd *cobra.Command) {
 }
 
 func (o *option) runE(cmd *cobra.Command, args []string) (err error) {
-	mdFilePath := args[0]
+	scriptRunners := NewScriptRunners()
+
+	for _, mdFilePath := range args {
+		var files []string
+		if files, err = filepath.Glob(mdFilePath); err != nil {
+			return
+		}
+
+		for _, file := range files {
+			var runners ScriptRunners
+			if runners, err = o.parseMarkdownRunner(file); err != nil {
+				break
+			}
+
+			scriptRunners = append(scriptRunners, runners...)
+		}
+	}
 
 	for {
-		err = o.runMarkdown(mdFilePath)
+		err = o.executeScripts(scriptRunners)
 
 		if !o.loop {
 			break
@@ -45,19 +62,17 @@ func (o *option) runE(cmd *cobra.Command, args []string) (err error) {
 	return
 }
 
-func (o *option) runMarkdown(mdFilePath string) (err error) {
+func (o *option) parseMarkdownRunner(mdFilePath string) (scriptList ScriptRunners, err error) {
 	var mdFile []byte
 	mdFile, err = os.ReadFile(mdFilePath)
 	if err != nil {
 		return
 	}
 
-	//Parse the markdown
+	// Parse the markdown
+	scriptList = ScriptRunners{}
 	md := markdown.New(markdown.XHTMLOutput(true), markdown.Nofollow(true))
 	tokens := md.Parse(mdFile)
-
-	// cmdMap := map[string][]string{}
-	scriptList := NewScriptRunners()
 
 	// Print the result
 	var title string
@@ -111,7 +126,6 @@ func (o *option) runMarkdown(mdFilePath string) (err error) {
 			})
 		}
 	}
-	err = o.executeScripts(scriptList)
 	return
 }
 
