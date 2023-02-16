@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"io"
 	"os"
 	"path"
@@ -14,6 +15,7 @@ import (
 // ShellScript represents the shell script
 type ShellScript struct {
 	Script
+	ShellType string
 }
 
 // Run executes the script
@@ -40,7 +42,7 @@ func (s *ShellScript) Run() (err error) {
 			if pair, err = inputRequest(pair); err != nil {
 				break
 			}
-			os.Setenv(pair[0], pair[1])
+			_ = os.Setenv(pair[0], pair[1])
 			continue
 		} else {
 			err = s.runCmdLine(strings.Join(lines[i:], "\n"), s.Dir, s.KeepScripts)
@@ -51,7 +53,7 @@ func (s *ShellScript) Run() (err error) {
 	// reset the env
 	os.Clearenv()
 	for _, pair := range preDefinedEnv {
-		os.Setenv(strings.Split(pair, "=")[0], strings.Split(pair, "=")[1])
+		_ = os.Setenv(strings.Split(pair, "=")[0], strings.Split(pair, "=")[1])
 	}
 	return
 }
@@ -68,7 +70,18 @@ func (s *ShellScript) runCmdLine(cmdLine, contextDir string, keepScripts bool) (
 		}()
 	}
 
-	err = s.Execer.RunCommandInDir("bash", contextDir, path.Base(shellFile))
+	if s.ShellType == "shell" || s.ShellType == "" {
+		s.ShellType = "bash"
+	}
+
+	is := installer.Installer{
+		Provider: "github",
+	}
+	if err = is.CheckDepAndInstall(map[string]string{
+		s.ShellType: s.ShellType,
+	}); err == nil {
+		err = s.Execer.RunCommandInDir(s.ShellType, contextDir, path.Base(shellFile))
+	}
 	return
 }
 

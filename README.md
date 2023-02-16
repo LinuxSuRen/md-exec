@@ -10,6 +10,17 @@ For instance, it will execute those commands which in Markdown block via `mde RE
 ifconfig
 ```
 
+Run in different shells:
+```zsh
+#!title: Run in zsh
+readlink /proc/$$/exe
+```
+
+```dash
+#!title: Run in dash
+readlink /proc/$$/exe
+```
+
 ### Variable input support
 In some use cases, we need to change the variables or command line flags. Try the following demo:
 

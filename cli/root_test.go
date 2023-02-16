@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"os"
 	"testing"
 
 	"github.com/linuxsuren/http-downloader/pkg/exec"
@@ -9,6 +10,12 @@ import (
 )
 
 func TestNewRootCommand(t *testing.T) {
+	f, err := os.CreateTemp(os.TempDir(), "")
+	assert.Nil(t, err)
+	defer func() {
+		_ = f.Close()
+	}()
+
 	tests := []struct {
 		name   string
 		args   []string
@@ -17,6 +24,10 @@ func TestNewRootCommand(t *testing.T) {
 		name:   "no argument",
 		args:   nil,
 		hasErr: true,
+	}, {
+		name:   "a single file which is not Markdown",
+		args:   []string{f.Name()},
+		hasErr: false,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
