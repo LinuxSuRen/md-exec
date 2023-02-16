@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
-	"os/exec"
+	"path"
 	"strings"
 )
 
@@ -39,20 +39,7 @@ func (s *GolangScript) Run() (err error) {
 		}()
 	}
 
-	var goExec string
-	if goExec, err = exec.LookPath("go"); err != nil {
-		return
-	}
-
-	cmd := exec.Command(goExec, "run", goSourceFile)
-	cmd.Env = os.Environ()
-
-	var output []byte
-	if output, err = cmd.CombinedOutput(); err != nil {
-		fmt.Println(string(output), err)
-		return
-	}
-	fmt.Print(string(output))
+	err = s.Execer.RunCommandInDir("go", s.Dir, "run", path.Base(goSourceFile))
 	return
 }
 

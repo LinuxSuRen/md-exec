@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,7 +20,7 @@ func TestNewRootCommand(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := NewRootCommand()
+			cmd := NewRootCommand(exec.FakeExecer{}, &bytes.Buffer{})
 			assert.True(t, cmd.HasExample())
 
 			cmd.SetArgs(tt.args)
