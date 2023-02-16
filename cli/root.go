@@ -48,6 +48,9 @@ func (o *option) runE(cmd *cobra.Command, args []string) (err error) {
 		}
 
 		for _, file := range files {
+			if !strings.HasSuffix(file, ".md") {
+				continue
+			}
 			var runners ScriptRunners
 			if runners, err = o.parseMarkdownRunner(file); err != nil {
 				break
@@ -120,9 +123,10 @@ func (o *option) parseMarkdownRunner(mdFilePath string) (scriptList ScriptRunner
 		}
 
 		switch lang {
-		case "shell", "bash":
+		case "shell", "bash", "zsh", "csh", "tcsh", "dash", "fish", "ksh":
 			scriptList = append(scriptList, &ShellScript{
-				Script: script,
+				Script:    script,
+				ShellType: lang,
 			})
 		case "python3":
 			scriptList = append(scriptList, &PythonScript{
@@ -150,7 +154,7 @@ func (o *option) executeScripts(scriptRunners ScriptRunners) (err error) {
 		Message: "Choose the code block to run",
 		Options: scriptRunners.GetTitles(),
 	}
-	titles := []string{}
+	var titles []string
 	if err = survey.AskOne(selector, &titles, survey.WithKeepFilter(o.keepFilter)); err != nil {
 		return
 	}
