@@ -19,6 +19,16 @@ name=linuxsuren
 echo hello $name
 ```
 
+### Run in long time
+```shell
+#!title: Run long time
+for i in 1 2 3 4 5
+do
+    echo $i
+    sleep 1
+done
+```
+
 ### Run Python Script
 ```python3
 #!title: Python Hello World

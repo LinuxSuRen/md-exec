@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
-	"os/exec"
+	"path"
 )
 
 // PythonScript represents the Python script
@@ -24,20 +24,7 @@ func (s *PythonScript) Run() (err error) {
 		}()
 	}
 
-	var pyExec string
-	if pyExec, err = exec.LookPath("python3"); err != nil {
-		return
-	}
-
-	cmd := exec.Command(pyExec, shellFile)
-	cmd.Env = os.Environ()
-
-	var output []byte
-	if output, err = cmd.CombinedOutput(); err != nil {
-		fmt.Println(string(output), err)
-		return
-	}
-	fmt.Print(string(output))
+	err = s.Execer.RunCommandInDir("python3", s.Dir, path.Base(shellFile))
 	return
 }
 

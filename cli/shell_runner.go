@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path"
 	"regexp"
 	"strings"
@@ -29,7 +28,7 @@ func (s *ShellScript) Run() (err error) {
 	lines := strings.Split(s.Content, "\n")[1:]
 
 	preDefinedEnv := os.Environ()
-	for _, cmdLine := range lines {
+	for i, cmdLine := range lines {
 		var pair []string
 		var ok bool
 		ok, pair, err = isInputRequest(cmdLine)
@@ -43,10 +42,8 @@ func (s *ShellScript) Run() (err error) {
 			}
 			os.Setenv(pair[0], pair[1])
 			continue
-		}
-
-		err = runCmdLine(cmdLine, s.Dir, s.KeepScripts)
-		if err != nil {
+		} else {
+			err = s.runCmdLine(strings.Join(lines[i:], "\n"), s.Dir, s.KeepScripts)
 			break
 		}
 	}
@@ -56,6 +53,22 @@ func (s *ShellScript) Run() (err error) {
 	for _, pair := range preDefinedEnv {
 		os.Setenv(strings.Split(pair, "=")[0], strings.Split(pair, "=")[1])
 	}
+	return
+}
+
+func (s *ShellScript) runCmdLine(cmdLine, contextDir string, keepScripts bool) (err error) {
+	var shellFile string
+	if shellFile, err = writeAsShell(cmdLine, contextDir); err != nil {
+		fmt.Println(err)
+		return
+	}
+	if !keepScripts {
+		defer func() {
+			_ = os.RemoveAll(shellFile)
+		}()
+	}
+
+	err = s.Execer.RunCommandInDir("bash", contextDir, path.Base(shellFile))
 	return
 }
 
@@ -88,31 +101,6 @@ func inputRequest(pair []string) (result []string, err error) {
 		result[1] = value
 	}
 
-	return
-}
-
-func runCmdLine(cmdLine, contextDir string, keepScripts bool) (err error) {
-	var shellFile string
-	if shellFile, err = writeAsShell(cmdLine, contextDir); err != nil {
-		fmt.Println(err)
-		return
-	}
-	if !keepScripts {
-		defer func() {
-			_ = os.RemoveAll(shellFile)
-		}()
-	}
-
-	cmd := exec.Command("bash", path.Base(shellFile))
-	cmd.Dir = contextDir
-	cmd.Env = os.Environ()
-
-	var output []byte
-	if output, err = cmd.CombinedOutput(); err != nil {
-		fmt.Println(string(output), err)
-		return
-	}
-	fmt.Print(string(output))
 	return
 }
 

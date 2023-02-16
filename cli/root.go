@@ -3,6 +3,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/golang-commonmark/markdown"
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/spf13/cobra"
 )
 
@@ -17,14 +19,17 @@ import (
 var version string
 
 // NewRootCommand returns the instance of cobra.Command
-func NewRootCommand() (cmd *cobra.Command) {
-	opt := &option{}
+func NewRootCommand(execer exec.Execer, out io.Writer) (cmd *cobra.Command) {
+	opt := &option{
+		execer: execer,
+	}
 	cmd = &cobra.Command{
 		Use:     "mde",
 		Example: "mde README.md",
 		Args:    cobra.MinimumNArgs(1),
 		RunE:    opt.runE,
 	}
+	cmd.SetOut(out)
 	cmd.Version = version
 	flags := cmd.Flags()
 	flags.BoolVarP(&opt.loop, "loop", "", true, "Run the Markdown in loop mode.")
@@ -52,11 +57,13 @@ func (o *option) runE(cmd *cobra.Command, args []string) (err error) {
 		}
 	}
 
-	for {
-		err = o.executeScripts(scriptRunners)
+	if scriptRunners.Size() > 1 {
+		for {
+			err = o.executeScripts(scriptRunners)
 
-		if !o.loop {
-			break
+			if !o.loop {
+				break
+			}
 		}
 	}
 	return
@@ -109,6 +116,7 @@ func (o *option) parseMarkdownRunner(mdFilePath string) (scriptList ScriptRunner
 			Content:     originalContent,
 			Dir:         path.Dir(mdFilePath),
 			KeepScripts: o.keepScripts,
+			Execer:      o.execer,
 		}
 
 		switch lang {
@@ -133,6 +141,8 @@ type option struct {
 	loop        bool
 	keepFilter  bool
 	keepScripts bool
+
+	execer exec.Execer
 }
 
 func (o *option) executeScripts(scriptRunners ScriptRunners) (err error) {
