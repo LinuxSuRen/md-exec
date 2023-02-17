@@ -40,3 +40,15 @@ func TestNewRootCommand(t *testing.T) {
 		})
 	}
 }
+
+func TestParseMarkdownRUnner(t *testing.T) {
+	opt := &option{}
+	runners, err := opt.parseMarkdownRunner("../README.md")
+	if assert.Nil(t, err) {
+		assert.True(t, len(runners) > 0)
+		assert.NotNil(t, runners.GetRunner("Variable Input Hello World"))
+		assert.NotNil(t, runners.GetRunner("Python Hello World"))
+		assert.NotNil(t, runners.GetRunner("Run long time"))
+		assert.NotNil(t, runners.GetRunner("Golang Hello World"))
+	}
+}

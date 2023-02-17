@@ -1,13 +1,13 @@
 package cli
 
 import (
-	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"io"
 	"os"
 	"path"
 	"regexp"
 	"strings"
+
+	"github.com/linuxsuren/http-downloader/pkg/installer"
 
 	"github.com/AlecAivazis/survey/v2"
 )
@@ -60,27 +60,25 @@ func (s *ShellScript) Run() (err error) {
 
 func (s *ShellScript) runCmdLine(cmdLine, contextDir string, keepScripts bool) (err error) {
 	var shellFile string
-	if shellFile, err = writeAsShell(cmdLine, contextDir); err != nil {
-		fmt.Println(err)
-		return
-	}
-	if !keepScripts {
-		defer func() {
-			_ = os.RemoveAll(shellFile)
-		}()
-	}
+	if shellFile, err = writeAsShell(cmdLine, contextDir); err == nil {
+		if !keepScripts {
+			defer func() {
+				_ = os.RemoveAll(shellFile)
+			}()
+		}
 
-	if s.ShellType == "shell" || s.ShellType == "" {
-		s.ShellType = "bash"
-	}
+		if s.ShellType == "shell" || s.ShellType == "" {
+			s.ShellType = "bash"
+		}
 
-	is := installer.Installer{
-		Provider: "github",
-	}
-	if err = is.CheckDepAndInstall(map[string]string{
-		s.ShellType: s.ShellType,
-	}); err == nil {
-		err = s.Execer.RunCommandInDir(s.ShellType, contextDir, path.Base(shellFile))
+		is := installer.Installer{
+			Provider: "github",
+		}
+		if err = is.CheckDepAndInstall(map[string]string{
+			s.ShellType: s.ShellType,
+		}); err == nil {
+			err = s.Execer.RunCommandInDir(s.ShellType, contextDir, path.Base(shellFile))
+		}
 	}
 	return
 }
