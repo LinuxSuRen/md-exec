@@ -62,7 +62,9 @@ func (o *option) runE(cmd *cobra.Command, args []string) (err error) {
 
 	if scriptRunners.Size() > 1 {
 		for {
-			err = o.executeScripts(scriptRunners)
+			if err = o.executeScripts(scriptRunners); err != nil {
+				fmt.Fprintln(cmd.ErrOrStderr(), err.Error())
+			}
 
 			if !o.loop {
 				break
