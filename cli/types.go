@@ -1,6 +1,10 @@
 package cli
 
-import "github.com/linuxsuren/http-downloader/pkg/exec"
+import (
+	"context"
+
+	"github.com/linuxsuren/http-downloader/pkg/exec"
+)
 
 // Script represents a script object
 type Script struct {
@@ -14,7 +18,7 @@ type Script struct {
 
 // ScriptRunner is the interface of a common runner
 type ScriptRunner interface {
-	Run() error
+	Run(context.Context) error
 	GetTitle() string
 }
 
@@ -54,7 +58,7 @@ func (s ScriptRunners) Size() int {
 type QuitRunner struct{}
 
 // Run does nothing
-func (r *QuitRunner) Run() error {
+func (r *QuitRunner) Run(context.Context) error {
 	return nil
 }
 

@@ -2,9 +2,11 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"strings"
@@ -15,7 +17,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// should be inject during the build process
+// should be injected during the build process
 var version string
 
 // NewRootCommand returns the instance of cobra.Command
@@ -35,39 +37,42 @@ func NewRootCommand(execer exec.Execer, out io.Writer) (cmd *cobra.Command) {
 	flags.BoolVarP(&opt.loop, "loop", "", true, "Run the Markdown in loop mode.")
 	flags.BoolVarP(&opt.keepFilter, "keep-filter", "", true, "Indicate if keep the filter.")
 	flags.BoolVarP(&opt.keepScripts, "keep-scripts", "", false, "Indicate if keep the temporary scripts.")
+	flags.IntVarP(&opt.pageSize, "page-size", "", 6, "Number of the select items.")
 	return
 }
 
 func (o *option) runE(cmd *cobra.Command, args []string) (err error) {
-	scriptRunners := NewScriptRunners()
-
-	for _, mdFilePath := range args {
-		var files []string
-		if files, err = filepath.Glob(mdFilePath); err != nil {
-			return
-		}
-
-		for _, file := range files {
-			if !strings.HasSuffix(file, ".md") {
-				continue
-			}
-			var runners ScriptRunners
-			if runners, err = o.parseMarkdownRunner(file); err != nil {
-				break
-			}
-
-			scriptRunners = append(scriptRunners, runners...)
-		}
-	}
-
-	if scriptRunners.Size() > 1 {
+	var scriptRunners ScriptRunners
+	if scriptRunners, err = o.parseMarkdownRunners(args); err == nil && scriptRunners.Size() > 1 {
 		for {
 			if err = o.executeScripts(scriptRunners); err != nil {
-				fmt.Fprintln(cmd.ErrOrStderr(), err.Error())
+				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), err.Error())
 			}
 
 			if !o.loop {
 				break
+			}
+		}
+	}
+	return
+}
+
+func (o *option) parseMarkdownRunners(files []string) (scriptRunners ScriptRunners, err error) {
+	scriptRunners = NewScriptRunners()
+
+	for _, mdFilePath := range files {
+		var files []string
+		if files, err = filepath.Glob(mdFilePath); err == nil {
+			for _, file := range files {
+				if !strings.HasSuffix(file, ".md") {
+					continue
+				}
+				var runners ScriptRunners
+				if runners, err = o.parseMarkdownRunner(file); err != nil {
+					break
+				}
+
+				scriptRunners = append(scriptRunners, runners...)
 			}
 		}
 	}
@@ -147,17 +152,23 @@ type option struct {
 	loop        bool
 	keepFilter  bool
 	keepScripts bool
+	pageSize    int
 
 	execer exec.Execer
 }
 
 func (o *option) executeScripts(scriptRunners ScriptRunners) (err error) {
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt)
+
 	selector := &survey.MultiSelect{
 		Message: "Choose the code block to run",
 		Options: scriptRunners.GetTitles(),
 	}
 	var titles []string
-	if err = survey.AskOne(selector, &titles, survey.WithKeepFilter(o.keepFilter)); err != nil {
+	if err = survey.AskOne(selector, &titles,
+		survey.WithKeepFilter(o.keepFilter),
+		survey.WithPageSize(o.pageSize)); err != nil {
 		return
 	}
 
@@ -167,9 +178,15 @@ func (o *option) executeScripts(scriptRunners ScriptRunners) (err error) {
 			break
 		}
 
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			<-c
+			cancel()
+		}()
+
 		if runner := scriptRunners.GetRunner(title); runner == nil {
 			fmt.Println("cannot found runner:", title)
-		} else if err = runner.Run(); err != nil {
+		} else if err = runner.Run(ctx); err != nil {
 			break
 		}
 	}

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"os"
 	"path"
 )
@@ -11,7 +12,7 @@ type PythonScript struct {
 }
 
 // Run executes the script
-func (s *PythonScript) Run() (err error) {
+func (s *PythonScript) Run(ctx context.Context) (err error) {
 	var shellFile string
 	if shellFile, err = writeAsShell(s.Content, s.Dir); err == nil {
 		if !s.KeepScripts {

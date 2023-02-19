@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"testing"
 
 	"github.com/linuxsuren/http-downloader/pkg/exec"
@@ -41,7 +42,7 @@ echo 1`,
 				ShellType: tt.shellType,
 			}
 			assert.Equal(t, tt.title, shell.GetTitle())
-			err := shell.Run()
+			err := shell.Run(context.Background())
 			assert.Equal(t, tt.hasErr, err != nil)
 		})
 	}
@@ -105,6 +106,11 @@ docker ps`,
 		name:   "with extra whitespace",
 		cmd:    " k3d   create    cluster",
 		expect: []string{"k3d"},
+	}, {
+		name: "with EOF",
+		cmd: `EOF
+k3d create cluster`,
+		expect: nil,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

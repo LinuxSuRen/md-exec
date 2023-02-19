@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,7 @@ func TestScriptRunners(t *testing.T) {
 	quitRunner := runners.GetRunner("Quit")
 	if assert.NotNil(t, quitRunner) {
 		assert.Equal(t, "Quit", quitRunner.GetTitle())
-		assert.Nil(t, quitRunner.Run())
+		assert.Nil(t, quitRunner.Run(context.Background()))
 	}
 	assert.Equal(t, []string{"Quit"}, runners.GetTitles())
 }
