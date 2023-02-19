@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -21,7 +22,7 @@ func main(){
 `
 
 // Run executes the script
-func (s *GolangScript) Run() (err error) {
+func (s *GolangScript) Run(ctx context.Context) (err error) {
 	s.Content = strings.ReplaceAll(s.Content, "#!title: "+s.Title, "")
 
 	var shellFile string

@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"context"
+	"testing"
+
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestPythonRunner(t *testing.T) {
@@ -31,7 +33,7 @@ echo 1`,
 				},
 			}
 			assert.Equal(t, tt.title, shell.GetTitle())
-			err := shell.Run()
+			err := shell.Run(context.Background())
 			assert.Equal(t, tt.hasErr, err != nil)
 		})
 	}

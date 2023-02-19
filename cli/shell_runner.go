@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"io"
 	"os"
 	"path"
@@ -19,13 +20,8 @@ type ShellScript struct {
 }
 
 // Run executes the script
-func (s *ShellScript) Run() (err error) {
-	// handle the break line
-	breakline := regexp.MustCompile(`\\\n`)
-	s.Content = breakline.ReplaceAllString(s.Content, "")
-
-	whitespaces := regexp.MustCompile(` +`)
-	s.Content = whitespaces.ReplaceAllString(s.Content, " ")
+func (s *ShellScript) Run(ctx context.Context) (err error) {
+	s.Content = strings.ReplaceAll(s.Content, "\r\n", "\n")
 
 	lines := strings.Split(s.Content, "\n")[1:]
 
@@ -89,6 +85,11 @@ func (s *ShellScript) runCmdLine(cmdLine, contextDir string, keepScripts bool) (
 }
 
 func findPotentialCommands(cmdLine string) (cmds []string) {
+	// TODO should find a better way to skip EOF part
+	if strings.Contains(cmdLine, "EOF") {
+		return
+	}
+
 	lines := strings.Split(cmdLine, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
