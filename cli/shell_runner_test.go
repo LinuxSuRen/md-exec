@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"testing"
+
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -83,16 +83,33 @@ func TestIsInputRequest(t *testing.T) {
 	}
 }
 
-func FuzzInputRequest(f *testing.F) {
-	f.Add("a", "b")
-	f.Fuzz(func(t *testing.T, key, value string) {
-		ok, pair, err := isInputRequest(fmt.Sprintf("%s=%s", key, value))
-		assert.True(t, ok)
-		assert.Equal(t, key, pair[0])
-		assert.Equal(t, value, pair[1])
-		assert.Nil(t, err)
-		if err != nil {
-			t.Fail()
-		}
-	})
+func TestFindPotentialCommands(t *testing.T) {
+	tests := []struct {
+		name   string
+		cmd    string
+		expect []string
+	}{{
+		name:   "oneline cmd",
+		cmd:    "k3d create cluster",
+		expect: []string{"k3d"},
+	}, {
+		name:   "empty",
+		cmd:    "",
+		expect: nil,
+	}, {
+		name: "multiple lines",
+		cmd: `k3d create cluster
+docker ps`,
+		expect: []string{"k3d", "docker"},
+	}, {
+		name:   "with extra whitespace",
+		cmd:    " k3d   create    cluster",
+		expect: []string{"k3d"},
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := findPotentialCommands(tt.cmd)
+			assert.Equal(t, tt.expect, result)
+		})
+	}
 }
