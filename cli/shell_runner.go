@@ -71,13 +71,29 @@ func (s *ShellScript) runCmdLine(cmdLine, contextDir string, keepScripts bool) (
 			s.ShellType = "bash"
 		}
 
+		deps := map[string]string{
+			s.ShellType: s.ShellType,
+		}
+		for _, cmd := range findPotentialCommands(cmdLine) {
+			deps[cmd] = cmd
+		}
+
 		is := installer.Installer{
 			Provider: "github",
 		}
-		if err = is.CheckDepAndInstall(map[string]string{
-			s.ShellType: s.ShellType,
-		}); err == nil {
+		if err = is.CheckDepAndInstall(deps); err == nil {
 			err = s.Execer.RunCommandInDir(s.ShellType, contextDir, path.Base(shellFile))
+		}
+	}
+	return
+}
+
+func findPotentialCommands(cmdLine string) (cmds []string) {
+	lines := strings.Split(cmdLine, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if items := strings.Split(line, " "); len(items) > 0 && items[0] != "" {
+			cmds = append(cmds, items[0])
 		}
 	}
 	return
