@@ -15,7 +15,7 @@ type GolangScript struct {
 
 var sampleGo = `
 package main
-import "fmt"
+%s
 func main(){
 	%s
 }
@@ -25,8 +25,11 @@ func main(){
 func (s *GolangScript) Run(ctx context.Context) (err error) {
 	s.Content = strings.ReplaceAll(s.Content, "#!title: "+s.Title, "")
 
+	imports := findImports(s.Content)
+	body := strings.ReplaceAll(s.Content, imports, "")
+
 	var shellFile string
-	if shellFile, err = writeAsShell(fmt.Sprintf(sampleGo, s.Content), s.Dir); err == nil {
+	if shellFile, err = writeAsShell(fmt.Sprintf(sampleGo, imports, body), s.Dir); err == nil {
 		goSourceFile := fmt.Sprintf("%s.go", shellFile)
 		os.Rename(shellFile, goSourceFile)
 
@@ -36,8 +39,27 @@ func (s *GolangScript) Run(ctx context.Context) (err error) {
 			}()
 		}
 
+		if err = s.Execer.RunCommandInDir("go", s.Dir, "mod", "init", "github.com/linuxsuren/test"); err != nil {
+			return
+		}
+
+		if err = s.Execer.RunCommandInDir("go", s.Dir, "mod", "tidy"); err != nil {
+			return
+		}
+
 		err = s.Execer.RunCommandInDir("go", s.Dir, "run", path.Base(goSourceFile))
 	}
+	return
+}
+
+func findImports(content string) (imports string) {
+	for _, line := range strings.Split(content, "\n") {
+		if !strings.HasPrefix(line, "import ") {
+			continue
+		}
+		imports += line + "\n"
+	}
+	imports = strings.TrimSpace(imports)
 	return
 }
 
