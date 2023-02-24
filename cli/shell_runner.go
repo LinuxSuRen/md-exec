@@ -93,8 +93,11 @@ func findPotentialCommands(cmdLine string) (cmds []string) {
 	lines := strings.Split(cmdLine, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if items := strings.Split(line, " "); len(items) > 0 && items[0] != "" {
-			cmds = append(cmds, items[0])
+		reg, err := regexp.Compile(`^(hd|curl|wget|k3d|docker)`)
+		if err == nil && reg.Match([]byte(line)) {
+			if cmd := reg.Find([]byte(line)); cmd != nil {
+				cmds = append(cmds, string(cmd))
+			}
 		}
 	}
 	return
