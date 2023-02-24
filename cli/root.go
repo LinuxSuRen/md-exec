@@ -139,6 +139,10 @@ func (o *option) parseMarkdownRunner(mdFilePath string) (scriptList ScriptRunner
 			scriptList = append(scriptList, &PythonScript{
 				Script: script,
 			})
+		case "groovy":
+			scriptList = append(scriptList, &GroovyScript{
+				Script: script,
+			})
 		case "golang", "go":
 			scriptList = append(scriptList, &GolangScript{
 				Script: script,
