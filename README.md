@@ -2,6 +2,11 @@
 [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/5022a74d146f487581821fd1c3435437)](https://www.codacy.com/gh/LinuxSuRen/md-exec/dashboard?utm_source=github.com&utm_medium=referral&utm_content=LinuxSuRen/md-exec&utm_campaign=Badge_Coverage)
 ![GitHub All Releases](https://img.shields.io/github/downloads/linuxsuren/md-exec/total)
 
+## Feature
+
+* Support to run `shell`, `python`, `Golang`, and `Groovy`
+* Load multiple Markdown files
+
 ## Usage
 `md-exec` could exec the commands in the Markdown files.
 For instance, it will execute those commands which in Markdown block via `mde README.md`
@@ -56,6 +61,17 @@ items := []int{1,2,3,4}
 for _, item := range items {
     fmt.Println(item)
 }
+```
+
+## Run Groovy
+```groovy
+#!title: Groovy Hello World
+class Foo {
+    void hello(){
+        println "hello"
+    }
+}
+new Foo().hello()
 ```
 
 ## Limitation
