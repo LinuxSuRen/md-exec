@@ -37,7 +37,8 @@ func NewRootCommand(execer exec.Execer, out io.Writer) (cmd *cobra.Command) {
 	flags.BoolVarP(&opt.loop, "loop", "", true, "Run the Markdown in loop mode.")
 	flags.BoolVarP(&opt.keepFilter, "keep-filter", "", true, "Indicate if keep the filter.")
 	flags.BoolVarP(&opt.keepScripts, "keep-scripts", "", false, "Indicate if keep the temporary scripts.")
-	flags.IntVarP(&opt.pageSize, "page-size", "", 6, "Number of the select items.")
+	flags.IntVarP(&opt.pageSize, "page-size", "", 8, "Number of the select items.")
+	flags.StringVarP(&opt.filter, "filter", "", "", "Filter of the scripts")
 	return
 }
 
@@ -157,6 +158,7 @@ type option struct {
 	keepFilter  bool
 	keepScripts bool
 	pageSize    int
+	filter      string
 
 	execer exec.Execer
 }
@@ -168,10 +170,19 @@ func (o *option) executeScripts(scriptRunners ScriptRunners) (err error) {
 	selector := &survey.MultiSelect{
 		Message: "Choose the code block to run",
 		Options: scriptRunners.GetTitles(),
+		VimMode: true,
 	}
 	var titles []string
 	if err = survey.AskOne(selector, &titles,
 		survey.WithKeepFilter(o.keepFilter),
+		survey.WithFilter(func(filter, value string, index int) (include bool) {
+			include = true
+			value = strings.ToLower(value)
+			if o.filter != "" && value != "quit" {
+				include = strings.Contains(value, o.filter)
+			}
+			return
+		}),
 		survey.WithPageSize(o.pageSize)); err != nil {
 		return
 	}
