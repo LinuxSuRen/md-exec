@@ -49,7 +49,9 @@ func (s *ShellScript) Run(ctx context.Context) (err error) {
 	// reset the env
 	os.Clearenv()
 	for _, pair := range preDefinedEnv {
-		_ = os.Setenv(strings.Split(pair, "=")[0], strings.Split(pair, "=")[1])
+		if key, val, ok := strings.Cut(pair, "="); ok {
+			_ = os.Setenv(key, val)
+		}
 	}
 	return
 }

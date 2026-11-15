@@ -2,12 +2,31 @@ package cli
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestShellEnvRestore(t *testing.T) {
+	// values containing the separator must survive the env snapshot/restore
+	// which happens around every shell script run
+	const envKey = "MDE_TEST_ENV_PAIR"
+	t.Setenv(envKey, "before=middle=after")
+
+	shell := &ShellScript{
+		Script: Script{
+			Title:   "env restore",
+			Content: "#!title: env restore\necho 1",
+			Execer:  exec.FakeExecer{},
+		},
+		ShellType: "bash",
+	}
+	assert.Nil(t, shell.Run(context.Background()))
+	assert.Equal(t, "before=middle=after", os.Getenv(envKey))
+}
 
 func TestShell(t *testing.T) {
 	tests := []struct {
