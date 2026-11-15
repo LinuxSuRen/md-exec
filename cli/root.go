@@ -2,7 +2,9 @@
 package cli
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/golang-commonmark/markdown"
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/spf13/cobra"
@@ -44,15 +47,28 @@ func NewRootCommand(execer exec.Execer, out io.Writer) (cmd *cobra.Command) {
 
 func (o *option) runE(cmd *cobra.Command, args []string) (err error) {
 	var scriptRunners ScriptRunners
-	if scriptRunners, err = o.parseMarkdownRunners(args); err == nil && scriptRunners.Size() > 1 {
-		for {
-			if err = o.executeScripts(scriptRunners); err != nil {
-				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), err.Error())
-			}
+	if scriptRunners, err = o.parseMarkdownRunners(args); err != nil {
+		return
+	}
 
-			if !o.loop {
-				break
+	// only the built-in quit item means nothing runnable was found
+	if scriptRunners.Size() <= 1 {
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "no runnable code blocks found in:", strings.Join(args, ", "))
+		return
+	}
+
+	for {
+		if err = o.executeScripts(scriptRunners); err != nil {
+			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), err.Error())
+
+			// do not show the selector again when the user interrupted it
+			if errors.Is(err, terminal.InterruptErr) {
+				o.loop = false
 			}
+		}
+
+		if !o.loop {
+			break
 		}
 	}
 	return
@@ -86,6 +102,10 @@ func (o *option) parseMarkdownRunner(mdFilePath string) (scriptList ScriptRunner
 	if err != nil {
 		return
 	}
+
+	// normalize the Windows line endings (CRLF) before parsing,
+	// otherwise the markdown parser cannot detect the code blocks correctly
+	mdFile = bytes.ReplaceAll(mdFile, []byte("\r\n"), []byte("\n"))
 
 	// Parse the markdown
 	scriptList = ScriptRunners{}
@@ -164,8 +184,9 @@ type option struct {
 }
 
 func (o *option) executeScripts(scriptRunners ScriptRunners) (err error) {
-	c := make(chan os.Signal)
+	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
+	defer signal.Stop(c)
 
 	selector := &survey.MultiSelect{
 		Message: "Choose the code block to run",
@@ -195,13 +216,21 @@ func (o *option) executeScripts(scriptRunners ScriptRunners) (err error) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		go func() {
-			<-c
-			cancel()
+			select {
+			case <-c:
+				cancel()
+			case <-ctx.Done():
+			}
 		}()
 
 		if runner := scriptRunners.GetRunner(title); runner == nil {
 			fmt.Println("cannot found runner:", title)
-		} else if err = runner.Run(ctx); err != nil {
+		} else {
+			err = runner.Run(ctx)
+		}
+		cancel()
+
+		if err != nil {
 			break
 		}
 	}

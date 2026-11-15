@@ -6,6 +6,7 @@
 
 * Support to run `shell`, `python`, `Golang`, and `Groovy`
 * Load multiple Markdown files
+* Work with both LF and CRLF (Windows) line endings
 
 ## Usage
 `md-exec` could exec the commands in the Markdown files.
@@ -73,7 +74,3 @@ class Foo {
 }
 new Foo().hello()
 ```
-
-## Limitation
-Please make sure the Markdown files meet Linux end-of-line.
-You could turn it via: `dos2unix your.md`
