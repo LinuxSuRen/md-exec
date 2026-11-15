@@ -164,8 +164,9 @@ type option struct {
 }
 
 func (o *option) executeScripts(scriptRunners ScriptRunners) (err error) {
-	c := make(chan os.Signal)
+	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
+	defer signal.Stop(c)
 
 	selector := &survey.MultiSelect{
 		Message: "Choose the code block to run",
@@ -195,13 +196,21 @@ func (o *option) executeScripts(scriptRunners ScriptRunners) (err error) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		go func() {
-			<-c
-			cancel()
+			select {
+			case <-c:
+				cancel()
+			case <-ctx.Done():
+			}
 		}()
 
 		if runner := scriptRunners.GetRunner(title); runner == nil {
 			fmt.Println("cannot found runner:", title)
-		} else if err = runner.Run(ctx); err != nil {
+		} else {
+			err = runner.Run(ctx)
+		}
+		cancel()
+
+		if err != nil {
 			break
 		}
 	}

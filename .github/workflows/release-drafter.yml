@@ -5,10 +5,13 @@ on:
     branches:
       - master
 
+permissions:
+  contents: read
+
 jobs:
   UpdateReleaseDraft:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: release-drafter/release-drafter@v5
+      - uses: release-drafter/release-drafter@v6
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PUBLISH_SECRETS }}

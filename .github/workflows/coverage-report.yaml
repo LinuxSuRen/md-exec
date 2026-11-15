@@ -4,15 +4,19 @@ on:
   - push
   - pull_request
 
+permissions:
+  contents: read
+
 jobs:
   TestAndReport:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.18.x
-      - uses: actions/checkout@v3.0.0
+          go-version: '1.18'
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Test
         run: |
           go test ./... -coverprofile coverage.out
@@ -20,4 +24,8 @@ jobs:
         env:
           CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
         run: |
+          if [ -z "$CODACY_PROJECT_TOKEN" ]; then
+            echo "CODACY_PROJECT_TOKEN is not available, skip the coverage report"
+            exit 0
+          fi
           bash <(curl -Ls https://coverage.codacy.com/get.sh) report -r coverage.out --force-coverage-parser go
